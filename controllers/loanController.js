@@ -1,10 +1,12 @@
-const mysql = require('mysql');
-const db = mysql.createConnection({
-    host: "localhost",
-    user: 'root',
-    password: '1234',
-    database: 'customerdata' // Change the database name to 'customerdata'
-  });
+
+const {
+  calculateSumCurrentEMIs,
+  getMonthlySalary,
+  calculateMonthlyInstallment,
+  getLoanHistory,
+  calculateCreditScore
+} = require('./helpers');
+const db = require('../db');
   
 
   function viewLoanDetails(req, res) {
@@ -134,8 +136,7 @@ function makePayment(req, res) {
           }
           let new_emipaidontime=emi_paid_on_time+1;
   
-          const updateQuery = `UPDATE loan_data SET emi_paid_on_time = ?, monthly_payment = ? WHERE customer_id = ? AND loan_id = ?
-`;
+          const updateQuery = `UPDATE loan_data SET emi_paid_on_time = ?, monthly_payment = ? WHERE customer_id = ? AND loan_id = ?`;
 
   
           db.query(updateQuery, [new_emipaidontime,monthly_payment, customer_id, loan_id], (err) => {
@@ -151,7 +152,7 @@ function makePayment(req, res) {
     });
   }
   
-  function calculateMonthlyPayment(amountPaid, interest_rate, tenure) {
+ function calculateMonthlyPayment(amountPaid, interest_rate, tenure) {
     const monthlyInterestRate = interest_rate / 12 / 100; // Convert annual interest rate to monthly and 
   
     const numerator = amountPaid * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, tenure));
@@ -159,9 +160,103 @@ function makePayment(req, res) {
     const newMonthlyPayment = numerator / denominator;
   
     return newMonthlyPayment;
-  }
+ }
+
+ async function checkEligiblity (req, res) {
   
+  const { customer_id, loan_amount, interest_rate, tenure } = req.body;
+
+  try {
+    const creditScore = await calculateCreditScore(customer_id);
+
+    const sumCurrentEMIs = await calculateSumCurrentEMIs(customer_id);
+    const monthlySalary = await getMonthlySalary(customer_id);
+
+    let approval = false;
+    let correctedInterestRate = interest_rate;
+
+    if (creditScore > 50) {
+      approval = true;
+    } else if (creditScore > 30) {
+      if (interest_rate > 12) {
+        correctedInterestRate = 12;
+      }
+      approval = true;
+    } else if (creditScore > 10) {
+      if (interest_rate > 16) {
+        correctedInterestRate = 16;
+      }
+      approval = true;
+    }
+
+    if (sumCurrentEMIs > 0.5 * monthlySalary) {
+      approval = false;
+    }
+
+    const monthlyInstallment = calculateMonthlyInstallment(loan_amount, correctedInterestRate, tenure);
+
+    const response = {
+      creditScore,
+      customer_id,
+      approval,
+      interest_rate,
+      corrected_interest_rate: correctedInterestRate,
+      tenure,
+      monthly_installment: monthlyInstallment,
+    };
+
+    res.json(response);
+  } catch (error) {
+    // Handle errors, you can customize the error response as needed.
+    console.error("Error in checkEligibility:", error);
+    res.status(500).json({ error: "An error occurred while processing the request." });
+  }
+ }
+
+ function viewStatement(req, res) {
+  const customer_id = req.params.customer_id;
+  const loan_id = req.params.loan_id;
+
+  const statementQuery = `
+    SELECT
+      customer_id,
+      loan_id,
+      loan_amount,
+      interest_rate,
+      monthly_payment,
+      emi_paid_on_time
+    FROM loan_data
+    WHERE customer_id = ? AND loan_id = ?
+  `;
+
+  db.query(statementQuery, [customer_id, loan_id], (err, statementResult) => {
+    if (err) {
+      console.error('Error fetching statement details:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    } else {
+      if (statementResult.length === 0) {
+        res.status(404).json({ error: 'Loan statement not found' });
+      } else {
+        const statement = statementResult[0];
+        
+        // Calculate amountPaid and repayments_left
+        const amountPaid = (statement.emi_paid_on_time * statement.monthly_payment);
+        const repayments_left = Math.ceil((statement.loan_amount - amountPaid) / statement.monthly_payment);
+        
+        // Add the calculated values to the statement object
+        statement.amountPaid = amountPaid;
+        statement.repayments_left = repayments_left;
+
+        res.json(statement);
+      }
+    }
+  });
+}
+
+
 module.exports = {
   viewLoanDetails,
-  makePayment
+  makePayment,
+  checkEligiblity,
+  viewStatement
 };
