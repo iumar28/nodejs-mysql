@@ -5,8 +5,7 @@ function getCustomerData(req,res) {
     if (err) {
       throw err;
     }
-    console.log(result);
-    res.json(result); // Send the data as JSON response
+    res.json(result); 
   });
 }
 
@@ -36,7 +35,6 @@ function registerCustomer(req, res) {
     if (err) {
       throw err;
     }
-    console.log('Customer added to the database');
     const name = `${first_name} ${last_name}`;
     res.json({
       customer_id,

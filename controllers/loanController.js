@@ -3,7 +3,6 @@ const {
   calculateSumCurrentEMIs,
   getMonthlySalary,
   calculateMonthlyInstallment,
-  getLoanHistory,
   calculateCreditScore
 } = require('./helpers');
 const db = require('../db');
@@ -54,7 +53,6 @@ const db = require('../db');
             } else {
               const customerDetails = customerResult[0];
 
-              // Create the response body
               const responseBody = {
                 loan_id: loanDetails.loan_id,
                 customer: {
@@ -80,23 +78,19 @@ const db = require('../db');
   }
 
 function calculateMonthlyPayment(amountPaid, interest_rate, tenure) {
-    // Ensure that amountPaid is a valid number and greater than 0
     if (isNaN(amountPaid) || amountPaid <= 0) {
       throw new Error('Invalid amountPaid value');
     }
   
-    // Ensure that interest_rate and tenure are valid numbers
     if (isNaN(interest_rate) || isNaN(tenure)) {
       throw new Error('Invalid interest_rate or tenure value');
     }
   
-    // Check for division by zero
     if (interest_rate === 0 || tenure === 0) {
       throw new Error('Interest rate and tenure must be greater than zero');
     }
   
-    // Calculate the new monthly payment
-    const monthlyInterestRate = interest_rate / 12 / 100; // Convert annual interest rate to monthly and percentage to decimal
+    const monthlyInterestRate = interest_rate / 12 / 100; 
     const denominator = Math.pow(1 + monthlyInterestRate, tenure) - 1;
     const newMonthlyPayment = (amountPaid * monthlyInterestRate) / denominator;
   
@@ -124,15 +118,12 @@ function makePayment(req, res) {
           res.status(404).json({ error: 'Loan not found' });
         } else {
           const loanDetails = loanResult[0];
-          console.log(`loandetails`,loanDetails);
           const {interest_rate, tenure, monthly_payment,emi_paid_on_time } = loanDetails;
-          console.log(loanDetails);
   
           
           let newMonthlyPayment=monthly_payment;
           if(amountPaid<monthly_payment){
             newMonthlyPayment = calculateMonthlyPayment(amountPaid, interest_rate, tenure);
-            console.log(`newmonthlypayment`, newMonthlyPayment);
           }
           let new_emipaidontime=emi_paid_on_time+1;
   
@@ -153,7 +144,7 @@ function makePayment(req, res) {
   }
   
  function calculateMonthlyPayment(amountPaid, interest_rate, tenure) {
-    const monthlyInterestRate = interest_rate / 12 / 100; // Convert annual interest rate to monthly and 
+    const monthlyInterestRate = interest_rate / 12 / 100;
   
     const numerator = amountPaid * (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, tenure));
     const denominator = Math.pow(1 + monthlyInterestRate, tenure) - 1;
@@ -207,7 +198,6 @@ function makePayment(req, res) {
 
     res.json(response);
   } catch (error) {
-    // Handle errors, you can customize the error response as needed.
     console.error("Error in checkEligibility:", error);
     res.status(500).json({ error: "An error occurred while processing the request." });
   }
@@ -239,11 +229,9 @@ function makePayment(req, res) {
       } else {
         const statement = statementResult[0];
         
-        // Calculate amountPaid and repayments_left
         const amountPaid = (statement.emi_paid_on_time * statement.monthly_payment);
         const repayments_left = Math.ceil((statement.loan_amount - amountPaid) / statement.monthly_payment);
         
-        // Add the calculated values to the statement object
         statement.amountPaid = amountPaid;
         statement.repayments_left = repayments_left;
 

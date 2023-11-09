@@ -51,8 +51,6 @@ async function getLoanHistory(customer_id) {
 async function calculateCreditScore(customer_id) {
   try {
     const loanHistory = await getLoanHistory(customer_id);
-    // console.log(`this is loan history`,loanHistory.loan_amount);
-
     let paidOnTimePercentage = 0;
     let numberOfLoans = 0;
     let currentYearLoanActivity = 0;
@@ -60,7 +58,6 @@ async function calculateCreditScore(customer_id) {
     let sumCurrentLoans = 0;
 
     for (const loan of loanHistory) {
-      console.log(`fdsdfsdsdfds`,loan.emi_paid_on_time);
       if (loan.emi_paid_on_time) {
         paidOnTimePercentage++;
       }
@@ -95,7 +92,6 @@ async function calculateCreditScore(customer_id) {
 
     creditScore = Math.min(100, Math.max(0, creditScore));
 
-    console.log(`finalcreditscore`,creditScore);
     return creditScore;
   } catch (err) {
     throw err;
